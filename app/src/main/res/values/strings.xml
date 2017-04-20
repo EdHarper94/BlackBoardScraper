@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">BlackBoardScraper</string>
+
+    <string name="module_title_view">Current Enrolled Modules: </string>
 </resources>

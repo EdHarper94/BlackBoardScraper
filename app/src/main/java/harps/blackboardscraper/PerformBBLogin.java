@@ -6,42 +6,54 @@ import android.util.Log;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
 
 import java.util.Map;
 
 /**
- * Created by eghar on 19/04/2017.
+ * @file PerformBBLogin.java
+ * @author  Ed Harper
+ * @date 23/03/2017
+ * @see CookieStorage
+ *
+ * Performs login on Blackboard using JSoup and stores cookies in CookieStorage
  */
 
 public class PerformBBLogin extends AsyncTask<Void, Void, String> {
 
+    /**
+     * Interface to pass back perform BB login result
+     */
     public interface PerformBBLoginResponse{
         void loginResult(String result);
     }
 
+    // Delegate variable
     public PerformBBLoginResponse delegate = null;
 
-    final String baseUrl = "https://blackboard.swan.ac.uk/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_49_1";
-    final String loginUrl = "https://blackboard.swan.ac.uk/webapps/login/";
-    final String nextUrl = "https://blackboard.swan.ac.uk/webapps/portal/execute/defaultTab";
-    final String userAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36";
+    final String BASE_URL = "https://blackboard.swan.ac.uk/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_49_1";
+    final String LOGIN_URL = "https://blackboard.swan.ac.uk/webapps/login/";
+    final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36";
 
     final private String CONNECTION_FAIL = "CONNECTION_FAIL";
     final private String LOGIN_FAIL = "LOGIN_FAIL";
     final private String SUCCESS = "SUCCESS";
 
+    // Cookie map variable
     private Map<String, String> cookies;
+    // Init Cookie Store
+    private CookieStorage cookieStorage = new CookieStorage();
 
-    private String username = BlackboardUser.getUsername();
-    private String password = BlackboardUser.getPassword();
+    private String username;
+    private String password;
 
     private int statusCode;
     private Exception exception;
     private String successTitle = "";
 
-    private String result = null;
-
+    /**
+     * Initialises a new instance of PerformBBLogin
+     * @param delegate
+     */
     public PerformBBLogin(PerformBBLoginResponse delegate){
         this.username = BlackboardUser.getUsername();
         this.password = BlackboardUser.getPassword();
@@ -50,7 +62,7 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
 
 
     /**
-     * Perform login and store cookies
+     * Perform login and store cookies in Cookie Storage
      *
      * @param params
      * @return
@@ -60,7 +72,7 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
         try {
             // HTTP Get request
             Connection.Response getReq = Jsoup
-                    .connect(baseUrl)
+                    .connect(BASE_URL)
                     .method(Connection.Method.GET)
                     .execute();
 
@@ -70,7 +82,7 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
 
             // Login Request
             Connection.Response loginReq = Jsoup
-                    .connect(loginUrl)
+                    .connect(LOGIN_URL)
                     .header("Host", "blackboard.swan.ac.uk")
                     .referrer("https://blackboard.swan.ac.uk/webapps/login/")
                     .cookies(cookies)
@@ -79,7 +91,7 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
                     .data("login", "Login")
                     .data("action", "login")
                     .data("new_loc", "")
-                    .userAgent(userAgent)
+                    .userAgent(USER_AGENT)
                     .referrer("https://blackboard.swan.ac.uk/webapps/login/")
 
                     .method(Connection.Method.POST)
@@ -87,34 +99,35 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
 
             // Get Status code
             statusCode = loginReq.statusCode();
-            //Store cookies
+            // Store cookies
             cookies = loginReq.cookies();
+            cookieStorage.storeCookies(cookies,LOGIN_URL);
             // DEBUG CODE
             System.out.println("STATUS CODE: " + statusCode);
             System.out.println("Login Cookies " + cookies);
 
-
+            // Request to check we are now logged in
             Document checkSuccess = Jsoup
                     .connect("https://blackboard.swan.ac.uk/webapps/portal/execute/tabs/tabAction?tab_tab_group_id=_23_1")
-                    .userAgent(userAgent)
-                    .referrer(loginUrl)
+                    .userAgent(USER_AGENT)
+                    .referrer(LOGIN_URL)
                     .cookies(cookies)
                     .get();
-
-            System.out.println(checkSuccess);
-
+            // Login success check variable
             successTitle = checkSuccess.title();
 
 
         } catch (Exception e) {
-            System.out.println("EXCEPTION");
             this.exception = e;
-
             exception.printStackTrace();
         }
         return null;
     }
 
+    /**
+     * Checks connection and log in was success and passes result back to calling method
+     * @param result
+     */
     protected void onPostExecute(String result) {
         if(statusCode != 200){
             System.out.println("Connection Issue" + statusCode + " Exception " + exception);
@@ -128,6 +141,7 @@ public class PerformBBLogin extends AsyncTask<Void, Void, String> {
             result = SUCCESS;
             System.out.println(result);
         }
+        // Set result
         delegate.loginResult(result);
     }
 }
